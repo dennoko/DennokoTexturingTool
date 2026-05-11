@@ -11,7 +11,8 @@ namespace Dennoko.TexturingTool.Runtime.Infrastructure
             var output = CreateCanvasTexture(config, Color.clear);
             BlitToCanvas(baseTexture, output);
 
-            foreach (var layer in config.layers)
+            var layers = config.layers ?? System.Array.Empty<LayerData>();
+            foreach (var layer in layers)
             {
                 if (!layer.enabled)
                 {
@@ -84,6 +85,11 @@ namespace Dennoko.TexturingTool.Runtime.Infrastructure
 
         private static void ApplyModifiers(Texture2D texture, System.Collections.Generic.IReadOnlyList<ModifierData> modifiers)
         {
+            if (modifiers == null)
+            {
+                return;
+            }
+
             foreach (var modifier in modifiers)
             {
                 if (modifier.type == ModifierType.ColorReplace)

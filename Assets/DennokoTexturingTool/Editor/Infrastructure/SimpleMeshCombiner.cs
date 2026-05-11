@@ -15,9 +15,10 @@ namespace Dennoko.TexturingTool.Editor.Infrastructure
                 throw new ArgumentException("Source mesh is missing.");
             }
 
-            var selected = config.selectedSubMeshIndices.Count == 0
+            var selectedIndices = config.selectedSubMeshIndices ?? new List<int>();
+            var selected = selectedIndices.Count == 0
                 ? BuildDefaultSubMeshList(source.Mesh.subMeshCount)
-                : config.selectedSubMeshIndices;
+                : selectedIndices;
 
             var combine = new List<CombineInstance>(selected.Count);
             foreach (var subMeshIndex in selected)
@@ -51,6 +52,11 @@ namespace Dennoko.TexturingTool.Editor.Infrastructure
 
         private static Texture2D FindBaseTexture(IReadOnlyList<Material> materials, IReadOnlyList<int> selected)
         {
+            if (materials == null)
+            {
+                return null;
+            }
+
             foreach (var index in selected)
             {
                 if (index < 0 || index >= materials.Count || materials[index] == null)
