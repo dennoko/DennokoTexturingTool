@@ -27,7 +27,7 @@ namespace Dennoko.TexturingTool.Runtime.Application
         {
             if (request.Config == null)
             {
-                throw new ArgumentNullException(nameof(request));
+                throw new ArgumentNullException(nameof(request.Config), "Configuration is required.");
             }
 
             var loaded = _fbxLoader.Load(request.Config.fbxAsset);

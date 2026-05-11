@@ -113,7 +113,10 @@ namespace Dennoko.TexturingTool.Runtime.Infrastructure
                 var dg = current.g - modifier.sourceColor.g;
                 var db = current.b - modifier.sourceColor.b;
                 var distance = Mathf.Sqrt((dr * dr) + (dg * dg) + (db * db));
-                if (distance <= modifier.threshold) pixels[i] = modifier.targetColor;
+                if (distance <= modifier.threshold)
+                {
+                    pixels[i] = new Color(modifier.targetColor.r, modifier.targetColor.g, modifier.targetColor.b, current.a);
+                }
             }
             texture.SetPixels(pixels);
         }
