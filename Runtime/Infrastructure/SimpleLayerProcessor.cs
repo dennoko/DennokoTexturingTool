@@ -1,26 +1,24 @@
+using System.Collections.Generic;
 using Dennoko.TexturingTool.Runtime.Data;
 using Dennoko.TexturingTool.Runtime.Domain;
 using UnityEngine;
 
 namespace Dennoko.TexturingTool.Runtime.Infrastructure
 {
+    // CPU fallback — prototype only. Replace GPU shaders are the production path.
     public sealed class SimpleLayerProcessor : ILayerProcessor
     {
-        public Texture2D Process(Texture2D baseTexture, TextureToolConfig config)
+        public Texture2D Process(Texture2D baseTexture, LayerProcessingContext ctx)
         {
-            var output = CreateCanvasTexture(config, Color.clear);
+            var config = ctx.Config;
+            var output = CreateCanvas(config, Color.clear);
             BlitToCanvas(baseTexture, output);
 
-            var layers = config.layers ?? new System.Collections.Generic.List<LayerData>();
-            foreach (var layer in layers)
+            foreach (var layer in config.layers ?? new List<LayerData>())
             {
-                if (!layer.enabled)
-                {
-                    continue;
-                }
-
-                var layerTexture = BuildLayerTexture(layer, config);
-                ApplyBlend(output, layerTexture, layer.blendMode);
+                if (!layer.enabled) continue;
+                var layerTex = BuildLayerTexture(layer, config);
+                ApplyBlend(output, layerTex, layer.blendMode, layer.opacity);
                 ApplyModifiers(output, layer.modifiers);
             }
 
@@ -29,106 +27,106 @@ namespace Dennoko.TexturingTool.Runtime.Infrastructure
             return output;
         }
 
-        private static Texture2D CreateCanvasTexture(TextureToolConfig config, Color fill)
+        private static Texture2D CreateCanvas(TextureToolConfig config, Color fill)
         {
-            var texture = new Texture2D(config.width, config.height, TextureFormat.RGBA32, false, config.colorSpace == ColorSpace.Linear);
+            var tex    = new Texture2D(config.width, config.height, TextureFormat.RGBA32, false,
+                                        config.colorSpace == ColorSpace.Linear);
             var pixels = new Color[config.width * config.height];
-            for (var i = 0; i < pixels.Length; i++) pixels[i] = fill;
-            texture.SetPixels(pixels);
-            texture.Apply();
-            return texture;
+            for (int i = 0; i < pixels.Length; i++) pixels[i] = fill;
+            tex.SetPixels(pixels);
+            tex.Apply();
+            return tex;
         }
 
         private static Texture2D BuildLayerTexture(LayerData layer, TextureToolConfig config)
         {
-            var texture = CreateCanvasTexture(config, layer.color);
+            var tex = CreateCanvas(config, layer.color);
             if (layer.type == LayerType.Texture && layer.texture != null)
-            {
-                BlitToCanvas(layer.texture, texture);
-            }
-            return texture;
+                BlitToCanvas(layer.texture, tex);
+            return tex;
         }
 
-        private static void BlitToCanvas(Texture2D source, Texture2D destination)
+        private static void BlitToCanvas(Texture2D src, Texture2D dst)
         {
-            if (source == null) return;
-            var pixels = new Color[destination.width * destination.height];
-            for (var y = 0; y < destination.height; y++)
+            if (src == null) return;
+            var pixels = new Color[dst.width * dst.height];
+            for (int y = 0; y < dst.height; y++)
+            for (int x = 0; x < dst.width;  x++)
             {
-                for (var x = 0; x < destination.width; x++)
-                {
-                    var u = destination.width == 1 ? 0f : x / (float)(destination.width - 1);
-                    var v = destination.height == 1 ? 0f : y / (float)(destination.height - 1);
-                    pixels[(y * destination.width) + x] = source.GetPixelBilinear(u, v);
-                }
+                float u = dst.width  == 1 ? 0f : x / (float)(dst.width  - 1);
+                float v = dst.height == 1 ? 0f : y / (float)(dst.height - 1);
+                pixels[y * dst.width + x] = src.GetPixelBilinear(u, v);
             }
-            destination.SetPixels(pixels);
-            destination.Apply();
+            dst.SetPixels(pixels);
+            dst.Apply();
         }
 
-        private static void ApplyBlend(Texture2D baseTexture, Texture2D layerTexture, BlendMode mode)
+        private static void ApplyBlend(Texture2D baseTexture, Texture2D layerTexture, BlendMode mode, float opacity)
         {
-            var basePixels = baseTexture.GetPixels();
+            var basePixels  = baseTexture.GetPixels();
             var layerPixels = layerTexture.GetPixels();
 
-            for (var i = 0; i < basePixels.Length; i++)
+            for (int i = 0; i < basePixels.Length; i++)
             {
-                var baseColor = basePixels[i];
-                var layerColor = layerPixels[i];
+                var b = basePixels[i];
+                var l = layerPixels[i];
                 var mixed = mode switch
                 {
-                    BlendMode.Add => baseColor + layerColor,
-                    BlendMode.Multiply => baseColor * layerColor,
-                    _ => Color.Lerp(baseColor, layerColor, layerColor.a)
+                    BlendMode.Add      => Clamp(b + l * opacity),
+                    BlendMode.Multiply => new Color(Mathf.Lerp(b.r, b.r*l.r, opacity),
+                                                    Mathf.Lerp(b.g, b.g*l.g, opacity),
+                                                    Mathf.Lerp(b.b, b.b*l.b, opacity), b.a),
+                    BlendMode.Overlay  => Overlay(b, l, opacity),
+                    BlendMode.Screen   => Screen(b, l, opacity),
+                    _                  => Color.Lerp(b, l, l.a * opacity)
                 };
-                basePixels[i] = ClampColor(mixed);
+                basePixels[i] = mixed;
             }
-
             baseTexture.SetPixels(basePixels);
         }
 
-        private static void ApplyModifiers(Texture2D texture, System.Collections.Generic.IReadOnlyList<ModifierData> modifiers)
+        private static Color Overlay(Color b, Color l, float op)
         {
-            if (modifiers == null)
-            {
-                return;
-            }
+            float R = b.r < 0.5f ? 2*b.r*l.r : 1-2*(1-b.r)*(1-l.r);
+            float G = b.g < 0.5f ? 2*b.g*l.g : 1-2*(1-b.g)*(1-l.g);
+            float B = b.b < 0.5f ? 2*b.b*l.b : 1-2*(1-b.b)*(1-l.b);
+            return Clamp(new Color(Mathf.Lerp(b.r,R,op), Mathf.Lerp(b.g,G,op), Mathf.Lerp(b.b,B,op), b.a));
+        }
 
-            foreach (var modifier in modifiers)
+        private static Color Screen(Color b, Color l, float op)
+        {
+            float R = 1-(1-b.r)*(1-l.r);
+            float G = 1-(1-b.g)*(1-l.g);
+            float B = 1-(1-b.b)*(1-l.b);
+            return Clamp(new Color(Mathf.Lerp(b.r,R,op), Mathf.Lerp(b.g,G,op), Mathf.Lerp(b.b,B,op), b.a));
+        }
+
+        private static void ApplyModifiers(Texture2D texture, IReadOnlyList<ModifierData> modifiers)
+        {
+            if (modifiers == null) return;
+            foreach (var m in modifiers)
             {
-                if (modifier.type == ModifierType.ColorReplace)
-                {
-                    ApplyColorReplace(texture, modifier);
-                }
+                if (m.type == ModifierType.ColorReplace) ApplyColorReplace(texture, m);
             }
         }
 
-        private static void ApplyColorReplace(Texture2D texture, ModifierData modifier)
+        private static void ApplyColorReplace(Texture2D texture, ModifierData m)
         {
             var pixels = texture.GetPixels();
-            var thresholdSquared = modifier.threshold * modifier.threshold;
-            for (var i = 0; i < pixels.Length; i++)
+            float sq   = m.threshold * m.threshold;
+            for (int i = 0; i < pixels.Length; i++)
             {
-                var current = pixels[i];
-                var dr = current.r - modifier.sourceColor.r;
-                var dg = current.g - modifier.sourceColor.g;
-                var db = current.b - modifier.sourceColor.b;
-                var distanceSquared = (dr * dr) + (dg * dg) + (db * db);
-                if (distanceSquared <= thresholdSquared)
-                {
-                    pixels[i] = new Color(modifier.targetColor.r, modifier.targetColor.g, modifier.targetColor.b, current.a);
-                }
+                var c  = pixels[i];
+                float dr = c.r-m.sourceColor.r, dg = c.g-m.sourceColor.g, db = c.b-m.sourceColor.b;
+                if (dr*dr + dg*dg + db*db <= sq)
+                    pixels[i] = new Color(m.targetColor.r, m.targetColor.g, m.targetColor.b, c.a);
             }
             texture.SetPixels(pixels);
         }
 
-        private static Color ClampColor(Color color)
-        {
-            color.r = Mathf.Clamp01(color.r);
-            color.g = Mathf.Clamp01(color.g);
-            color.b = Mathf.Clamp01(color.b);
-            color.a = Mathf.Clamp01(color.a);
-            return color;
-        }
+        private static Color Clamp(Color c)
+            => new Color(Mathf.Clamp01(c.r), Mathf.Clamp01(c.g), Mathf.Clamp01(c.b), Mathf.Clamp01(c.a));
+
+        public void Dispose() { }
     }
 }

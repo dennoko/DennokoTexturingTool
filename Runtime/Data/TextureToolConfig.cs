@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace Dennoko.TexturingTool.Runtime.Data
 {
-    [CreateAssetMenu(menuName = "Dennoko/Texturing Tool Config", fileName = "TextureToolConfig")]
+    [CreateAssetMenu(menuName = "dennokoworks/Texturing Tool Config", fileName = "TextureToolConfig")]
     public sealed class TextureToolConfig : ScriptableObject
     {
         [Header("Input")]
@@ -24,6 +24,9 @@ namespace Dennoko.TexturingTool.Runtime.Data
 
         [Header("Global Modifiers")]
         public List<ModifierData> globalModifiers = new();
+
+        [HideInInspector]
+        public List<string> snapshots = new();
     }
 
     [Serializable]
@@ -35,6 +38,11 @@ namespace Dennoko.TexturingTool.Runtime.Data
         public Texture2D texture;
         public Color color = Color.white;
         public BlendMode blendMode = BlendMode.Normal;
+        [Range(0f, 1f)] public float opacity = 1f;
+        public Vector2 tilingScale = Vector2.one;
+        public Vector2 tilingOffset = Vector2.zero;
+        public bool useIdMask;
+        public int idMaskSubMeshIndex;
         public List<ModifierData> modifiers = new();
     }
 
@@ -42,26 +50,26 @@ namespace Dennoko.TexturingTool.Runtime.Data
     public sealed class ModifierData
     {
         public ModifierType type = ModifierType.ColorReplace;
+        // ColorReplace
         public Color sourceColor = Color.white;
         public Color targetColor = Color.white;
         [Range(0.001f, 1f)] public float threshold = 0.1f;
+        // HSV
+        [Range(-0.5f, 0.5f)] public float hue;
+        [Range(-1f, 1f)] public float saturation;
+        [Range(-1f, 1f)] public float value;
+        // Levels
+        [Range(0f, 1f)] public float inMin;
+        [Range(0f, 1f)] public float inMax = 1f;
+        [Range(0f, 1f)] public float outMin;
+        [Range(0f, 1f)] public float outMax = 1f;
+        // EdgeDilation
+        [Range(1, 32)] public int dilationRadius = 4;
     }
 
-    public enum LayerType
-    {
-        Texture = 0,
-        Color = 1
-    }
+    public enum LayerType { Texture = 0, Color = 1 }
 
-    public enum BlendMode
-    {
-        Normal = 0,
-        Add = 1,
-        Multiply = 2
-    }
+    public enum BlendMode { Normal = 0, Add = 1, Multiply = 2, Overlay = 3, Screen = 4 }
 
-    public enum ModifierType
-    {
-        ColorReplace = 0
-    }
+    public enum ModifierType { ColorReplace = 0, HSV = 1, Levels = 2, EdgeDilation = 3 }
 }
