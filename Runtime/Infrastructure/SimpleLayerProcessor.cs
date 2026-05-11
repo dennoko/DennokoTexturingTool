@@ -11,7 +11,7 @@ namespace Dennoko.TexturingTool.Runtime.Infrastructure
             var output = CreateCanvasTexture(config, Color.clear);
             BlitToCanvas(baseTexture, output);
 
-            var layers = config.layers ?? System.Array.Empty<LayerData>();
+            var layers = config.layers ?? new System.Collections.Generic.List<LayerData>();
             foreach (var layer in layers)
             {
                 if (!layer.enabled)

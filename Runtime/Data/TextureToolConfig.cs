@@ -14,7 +14,7 @@ namespace Dennoko.TexturingTool.Runtime.Data
         [Header("Canvas")]
         public int width = 1024;
         public int height = 1024;
-        public ColorSpace colorSpace = ColorSpace.sRGB;
+        public ColorSpace colorSpace = ColorSpace.Gamma;
 
         [Header("Export")]
         public string exportRelativePath = "Assets/Generated/output.png";

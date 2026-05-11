@@ -35,12 +35,12 @@ namespace Dennoko.TexturingTool.Runtime.Infrastructure
 
             if (path.StartsWith("Assets"))
             {
-                var projectRoot = Directory.GetParent(Application.dataPath)?.FullName ?? ".";
+                var projectRoot = Directory.GetParent(UnityEngine.Application.dataPath)?.FullName ?? ".";
                 var relativePath = path.Substring("Assets".Length).TrimStart('/', '\\');
                 return Path.Combine(projectRoot, "Assets", relativePath);
             }
 
-            return Path.Combine(Application.dataPath, path);
+            return Path.Combine(UnityEngine.Application.dataPath, path);
         }
     }
 }
