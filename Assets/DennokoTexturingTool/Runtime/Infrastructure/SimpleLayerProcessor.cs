@@ -52,35 +52,39 @@ namespace Dennoko.TexturingTool.Runtime.Infrastructure
         private static void BlitToCanvas(Texture2D source, Texture2D destination)
         {
             if (source == null) return;
+            var pixels = new Color[destination.width * destination.height];
             for (var y = 0; y < destination.height; y++)
             {
                 for (var x = 0; x < destination.width; x++)
                 {
                     var u = destination.width == 1 ? 0f : x / (float)(destination.width - 1);
                     var v = destination.height == 1 ? 0f : y / (float)(destination.height - 1);
-                    destination.SetPixel(x, y, source.GetPixelBilinear(u, v));
+                    pixels[(y * destination.width) + x] = source.GetPixelBilinear(u, v);
                 }
             }
+            destination.SetPixels(pixels);
             destination.Apply();
         }
 
         private static void ApplyBlend(Texture2D baseTexture, Texture2D layerTexture, BlendMode mode)
         {
-            for (var y = 0; y < baseTexture.height; y++)
+            var basePixels = baseTexture.GetPixels();
+            var layerPixels = layerTexture.GetPixels();
+
+            for (var i = 0; i < basePixels.Length; i++)
             {
-                for (var x = 0; x < baseTexture.width; x++)
+                var baseColor = basePixels[i];
+                var layerColor = layerPixels[i];
+                var mixed = mode switch
                 {
-                    var baseColor = baseTexture.GetPixel(x, y);
-                    var layerColor = layerTexture.GetPixel(x, y);
-                    var mixed = mode switch
-                    {
-                        BlendMode.Add => baseColor + layerColor,
-                        BlendMode.Multiply => baseColor * layerColor,
-                        _ => Color.Lerp(baseColor, layerColor, layerColor.a)
-                    };
-                    baseTexture.SetPixel(x, y, ClampColor(mixed));
-                }
+                    BlendMode.Add => baseColor + layerColor,
+                    BlendMode.Multiply => baseColor * layerColor,
+                    _ => Color.Lerp(baseColor, layerColor, layerColor.a)
+                };
+                basePixels[i] = ClampColor(mixed);
             }
+
+            baseTexture.SetPixels(basePixels);
         }
 
         private static void ApplyModifiers(Texture2D texture, System.Collections.Generic.IReadOnlyList<ModifierData> modifiers)
@@ -101,21 +105,17 @@ namespace Dennoko.TexturingTool.Runtime.Infrastructure
 
         private static void ApplyColorReplace(Texture2D texture, ModifierData modifier)
         {
-            for (var y = 0; y < texture.height; y++)
+            var pixels = texture.GetPixels();
+            for (var i = 0; i < pixels.Length; i++)
             {
-                for (var x = 0; x < texture.width; x++)
-                {
-                    var current = texture.GetPixel(x, y);
-                    var distance = Vector3.Distance(
-                        new Vector3(current.r, current.g, current.b),
-                        new Vector3(modifier.sourceColor.r, modifier.sourceColor.g, modifier.sourceColor.b));
-
-                    if (distance <= modifier.threshold)
-                    {
-                        texture.SetPixel(x, y, modifier.targetColor);
-                    }
-                }
+                var current = pixels[i];
+                var dr = current.r - modifier.sourceColor.r;
+                var dg = current.g - modifier.sourceColor.g;
+                var db = current.b - modifier.sourceColor.b;
+                var distance = Mathf.Sqrt((dr * dr) + (dg * dg) + (db * db));
+                if (distance <= modifier.threshold) pixels[i] = modifier.targetColor;
             }
+            texture.SetPixels(pixels);
         }
 
         private static Color ClampColor(Color color)
