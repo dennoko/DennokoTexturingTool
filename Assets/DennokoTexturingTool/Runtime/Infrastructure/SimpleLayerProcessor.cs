@@ -106,14 +106,15 @@ namespace Dennoko.TexturingTool.Runtime.Infrastructure
         private static void ApplyColorReplace(Texture2D texture, ModifierData modifier)
         {
             var pixels = texture.GetPixels();
+            var thresholdSquared = modifier.threshold * modifier.threshold;
             for (var i = 0; i < pixels.Length; i++)
             {
                 var current = pixels[i];
                 var dr = current.r - modifier.sourceColor.r;
                 var dg = current.g - modifier.sourceColor.g;
                 var db = current.b - modifier.sourceColor.b;
-                var distance = Mathf.Sqrt((dr * dr) + (dg * dg) + (db * db));
-                if (distance <= modifier.threshold)
+                var distanceSquared = (dr * dr) + (dg * dg) + (db * db);
+                if (distanceSquared <= thresholdSquared)
                 {
                     pixels[i] = new Color(modifier.targetColor.r, modifier.targetColor.g, modifier.targetColor.b, current.a);
                 }
